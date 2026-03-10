@@ -1,0 +1,37 @@
+{
+  "name": "typodont",
+  "type": "module",
+  "version": "0.0.1",
+  "private": false,
+  "description": "Three.js typodont viewer",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "author": "Pratik Sharma <sharma.pratik2016@gmail.com>",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.mts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm,cjs --dts --loader:.glb=asset",
+    "dev": "tsdown --watch"
+  },
+  "devDependencies": {
+    "tsdown": "^0.21.1",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "three": "^0.183.2"
+  },
+  "peerDependencies": {
+    "three": "^0.183.0"
+  }
+}
