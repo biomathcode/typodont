@@ -3,6 +3,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 
+
 const modelUrl = new URL("../assets/typodont.glb", import.meta.url).href
 
 export class TypodontViewer {
@@ -74,6 +75,9 @@ export class TypodontViewer {
         loader.setDRACOLoader(draco)
 
         loader.load(modelUrl, (gltf) => {
+
+
+
             this.scene.add(gltf.scene)
         })
     }
