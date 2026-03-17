@@ -2,7 +2,10 @@ import * as THREE from "three"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
-
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js"
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js"
+import { OutlinePass } from "three/examples/jsm/postprocessing/OutlinePass.js"
+import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js"
 
 const modelUrl = new URL("../assets/typodont.glb", import.meta.url).href
 
@@ -22,6 +25,13 @@ export class TypodontViewer {
     selectedTooth?: THREE.Mesh
     outline?: THREE.LineSegments
 
+
+    composer!: EffectComposer
+    outlinePass!: OutlinePass
+    hoveredTooth?: THREE.Mesh
+
+    originalColors = new Map<THREE.Mesh, THREE.Color>()
+
     constructor(container: HTMLElement) {
         this.container = container
 
@@ -32,11 +42,30 @@ export class TypodontViewer {
         this.renderer.setSize(width, height)
         this.renderer.outputColorSpace = THREE.SRGBColorSpace
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-        this.renderer.toneMappingExposure = 1
         this.renderer.domElement.addEventListener("pointerdown", this.onPointerDown)
+        this.renderer.domElement.addEventListener("pointermove", this.onPointerMove)
 
 
         container.appendChild(this.renderer.domElement)
+
+        this.composer = new EffectComposer(this.renderer)
+
+        const renderPass = new RenderPass(this.scene, this.camera)
+        this.composer.addPass(renderPass)
+
+        this.outlinePass = new OutlinePass(
+            new THREE.Vector2(width, height),
+            this.scene,
+            this.camera
+        )
+
+        this.outlinePass.edgeStrength = 20
+        this.outlinePass.edgeGlow = 0
+        this.outlinePass.edgeThickness = 4
+        this.outlinePass.visibleEdgeColor.set(0xff00ff)
+        this.outlinePass.hiddenEdgeColor.set(0x000000)
+
+        this.composer.addPass(this.outlinePass)
 
         // camera
         this.camera.position.set(0, 0, 30)
@@ -50,7 +79,10 @@ export class TypodontViewer {
 
         this.scene.background = new THREE.Color(0xf5f5f5)
 
+
+
         this.setupLights()
+
         this.loadModel()
 
 
@@ -58,20 +90,53 @@ export class TypodontViewer {
 
         window.addEventListener("resize", this.onResize)
 
-        this.animate()
+        this.animate();
     }
 
     setupLights() {
-        const ambient = new THREE.AmbientLight(0xffffff, 0.6)
+        // Ambient (very low, just fill)
+        const ambient = new THREE.AmbientLight(0xffffff, 2)
         this.scene.add(ambient)
 
-        const key = new THREE.DirectionalLight(0xffffff, 1.2)
-        key.position.set(5, 10, 5)
+        // Key light (main)
+        const key = new THREE.DirectionalLight(0xffffff, .001)
+        key.position.set(5, 10, 10)
+        key.castShadow = false
         this.scene.add(key)
 
-        const fill = new THREE.DirectionalLight(0xffffff, 0.4)
-        fill.position.set(-5, 5, -5)
+        // Fill light (soft shadow reduction)
+        const fill = new THREE.DirectionalLight(0xffffff, 0.5)
+        fill.position.set(-5, 5, 5)
         this.scene.add(fill)
+
+        // Rim light (IMPORTANT for edges)
+        const rim = new THREE.DirectionalLight(0xffffff, 1.2)
+        rim.position.set(0, 5, -10)
+        this.scene.add(rim)
+
+        // Top highlight (teeth shine)
+        const top = new THREE.DirectionalLight(0xffffff, 0.8)
+        top.position.set(0, 15, 0)
+        this.scene.add(top)
+    }
+
+
+
+    createToonGradient() {
+        const size = 4
+        const data = new Uint8Array([
+            0, 0, 0,        // dark
+            85, 85, 85,     // mid-dark
+            170, 170, 170,  // mid
+            255, 255, 255   // light
+        ])
+
+        const texture = new THREE.DataTexture(data, size, 1, THREE.RGBFormat)
+        texture.needsUpdate = true
+        texture.minFilter = THREE.NearestFilter
+        texture.magFilter = THREE.NearestFilter
+
+        return texture
     }
 
     loadModel() {
@@ -95,18 +160,51 @@ export class TypodontViewer {
                         color: 0xffffff,
                         roughness: 0.15,   // lower = shinier
                         metalness: 0.0,    // teeth are not metal
-                        clearcoat: 1.0,    // glossy layer
-                        clearcoatRoughness: 0.05,
                     });
 
                     this.teethMeshes.push(child)
 
                     child.material = shinyMaterial;
                 }
+
+                if (child instanceof THREE.Mesh && child.name.includes("GUM")) {
+
+                    const material = new THREE.MeshLambertMaterial({
+                        color: 0xff0000,
+
+                    })
+
+                    child.material = material;
+                }
+
+
             });
 
             this.scene.add(gltf.scene);
         })
+    }
+
+    onPointerMove = (event: PointerEvent) => {
+        const rect = this.renderer.domElement.getBoundingClientRect()
+
+        this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+        this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+
+        this.raycaster.setFromCamera(this.mouse, this.camera)
+
+        const intersects = this.raycaster.intersectObjects(this.teethMeshes)
+
+        if (intersects.length > 0) {
+            const mesh = intersects[0].object as THREE.Mesh
+
+            if (this.hoveredTooth !== mesh) {
+                this.hoveredTooth = mesh
+                this.outlinePass.selectedObjects = [mesh]
+            }
+        } else {
+            this.hoveredTooth = undefined
+            this.outlinePass.selectedObjects = []
+        }
     }
 
 
@@ -125,39 +223,60 @@ export class TypodontViewer {
 
         const mesh = intersects[0].object as THREE.Mesh
 
+
         this.toggleTooth(mesh)
+
+        const clickcallback = new CustomEvent("toothclick", {
+            detail: {
+                toothName: mesh.name,
+            }
+        })
+
+        console.log(`Clicked on tooth: ${mesh.name} (index: ${this.teethMeshes.indexOf(mesh)})`)
+
+        this.container.dispatchEvent(clickcallback)
     }
 
     toggleTooth(mesh: THREE.Mesh) {
-
-        // clicking the same tooth again → deselect
         if (this.selectedTooth === mesh) {
-            this.removeOutline()
+            this.resetTooth(mesh)
             this.selectedTooth = undefined
             return
         }
 
-        // remove previous
-        this.removeOutline()
+        if (this.selectedTooth) {
+            this.resetTooth(this.selectedTooth)
+        }
 
         this.selectedTooth = mesh
-        this.addOutline(mesh)
+        this.highlightTooth(mesh)
+    }
+
+    highlightTooth(mesh: THREE.Mesh) {
+        const material = mesh.material as THREE.MeshPhysicalMaterial
+
+        if (!this.originalColors.has(mesh)) {
+            this.originalColors.set(mesh, material.color.clone())
+        }
+
+        material.color.set(0xffee00)
+    }
+
+    resetTooth(mesh: THREE.Mesh) {
+        const material = mesh.material as THREE.MeshPhysicalMaterial
+
+        const original = this.originalColors.get(mesh)
+        if (original) {
+            material.color.copy(original)
+        }
     }
 
     addOutline(mesh: THREE.Mesh) {
 
-        const edges = new THREE.EdgesGeometry(mesh.geometry)
 
-        const material = new THREE.LineBasicMaterial({
-            color: 0x2196f3
-        })
+        mesh.material.color.set(0xff0000);
 
-        const outline = new THREE.LineSegments(edges, material)
 
-        outline.renderOrder = 1
-        mesh.add(outline)
-
-        this.outline = outline
     }
 
     removeOutline() {
@@ -216,7 +335,7 @@ export class TypodontViewer {
 
         this.controls.update()
 
-        this.renderer.render(this.scene, this.camera)
+        this.composer.render()
     }
 
     destroy() {
