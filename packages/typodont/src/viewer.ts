@@ -32,6 +32,13 @@ export class TypodontViewer {
 
     originalColors = new Map<THREE.Mesh, THREE.Color>()
 
+    previewCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 100)
+
+    previewScene = new THREE.Scene()
+    previewLight!: THREE.DirectionalLight
+    previewAmbient!: THREE.AmbientLight
+    previewTooth?: THREE.Object3D
+
     constructor(container: HTMLElement) {
         this.container = container
 
@@ -78,6 +85,17 @@ export class TypodontViewer {
 
 
         this.scene.background = new THREE.Color(0xf5f5f5)
+
+
+
+        this.previewAmbient = new THREE.AmbientLight(0xffffff, 1.5)
+        this.previewScene.add(this.previewAmbient)
+
+        this.previewLight = new THREE.DirectionalLight(0xffffff, 1.5)
+        this.previewLight.position.set(5, 5, 5)
+        this.previewScene.add(this.previewLight)
+
+
 
 
 
@@ -248,8 +266,48 @@ export class TypodontViewer {
             this.resetTooth(this.selectedTooth)
         }
 
+        this.updatePreviewCamera(mesh)
+        this.updatePreview(mesh)
         this.selectedTooth = mesh
         this.highlightTooth(mesh)
+    }
+    updatePreviewCamera(obj: THREE.Object3D) {
+        const box = new THREE.Box3().setFromObject(obj)
+        const size = new THREE.Vector3()
+        box.getSize(size)
+
+        const maxDim = Math.max(size.x, size.y, size.z)
+        const distance = maxDim * 2
+
+        // since object is centered at origin
+        this.previewCamera.position.set(0, 0, distance)
+        this.previewCamera.lookAt(0, 0, 0)
+    }
+    updatePreview(mesh: THREE.Mesh) {
+        if (this.previewTooth) {
+            this.previewScene.remove(this.previewTooth)
+        }
+
+        const clone = mesh.clone()
+
+        // clone material
+        if (Array.isArray(clone.material)) {
+            clone.material = clone.material.map(m => m.clone())
+        } else {
+            clone.material = clone.material.clone()
+        }
+
+        // 🔥 IMPORTANT: center geometry
+        const box = new THREE.Box3().setFromObject(clone)
+        const center = new THREE.Vector3()
+        box.getCenter(center)
+
+        clone.position.sub(center) // move to origin
+
+        this.previewScene.add(clone)
+        this.previewTooth = clone
+
+        this.updatePreviewCamera(clone)
     }
 
     highlightTooth(mesh: THREE.Mesh) {
@@ -335,7 +393,36 @@ export class TypodontViewer {
 
         this.controls.update()
 
+        const width = this.container.clientWidth
+        const height = this.container.clientHeight
+
+        // ---- MAIN RENDER ----
+        this.renderer.setViewport(0, 0, width, height)
+        this.renderer.setScissorTest(false)
         this.composer.render()
+
+        // ---- MINI PREVIEW ----
+        if (this.previewTooth) {
+            const size = 400
+            const padding = 10
+
+            const x = padding
+            const y = padding
+
+            this.renderer.setViewport(x, y, size, size)
+            this.renderer.setScissor(x, y, size, size)
+            this.renderer.setScissorTest(true)
+
+            this.previewCamera.aspect = 1
+            this.previewCamera.updateProjectionMatrix()
+
+            this.renderer.setClearColor(0xffffff, 1)
+            this.renderer.clearDepth()
+
+            this.renderer.render(this.previewScene, this.previewCamera)
+
+            this.renderer.setScissorTest(false)
+        }
     }
 
     destroy() {

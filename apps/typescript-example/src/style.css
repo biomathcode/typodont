@@ -94,3 +94,9 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+
+#viewer {
+  width: 100vw;
+  height: 100vh;
+}
