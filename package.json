@@ -7,6 +7,7 @@
     "watch": "pnpm --filter=typodont dev",
     "dev": "pnpm run watch --onSuccess \"pnpm -w run site:dev\"",
     "build": "pnpm --filter=typodont build",
+    "test": "pnpm --filter=typodont test",
     "site:dev": "pnpm --filter=site dev",
     "site:build": "pnpm run build && pnpm --filter=site build",
     "lint": "pnpm --filter=typodont lint",
