@@ -2,6 +2,7 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import * as THREE from "three"
 import {
+    AnnotationToolPlugin,
     ExportPlugin,
     PaintToolPlugin,
     VisualizationToolPlugin
@@ -34,14 +35,53 @@ function createTooth(name) {
     return mesh
 }
 
+function installCanvasShim() {
+    globalThis.document = {
+        createElement(tagName) {
+            assert.equal(tagName, "canvas")
+            return {
+                width: 1,
+                height: 1,
+                getContext(type) {
+                    assert.equal(type, "2d")
+                    return {
+                        font: "",
+                        textBaseline: "top",
+                        fillStyle: "",
+                        strokeStyle: "",
+                        lineWidth: 1,
+                        measureText(text) {
+                            return { width: text.length * 8 }
+                        },
+                        beginPath() {},
+                        moveTo() {},
+                        arcTo() {},
+                        closePath() {},
+                        clearRect() {},
+                        fill() {},
+                        stroke() {},
+                        fillText() {}
+                    }
+                }
+            }
+        }
+    }
+}
+
 test("PaintToolPlugin restores serialized vertex paint state", async () => {
-    const tooth = createTooth("teeth-11")
+    const tooth = createTooth("teeth_11")
+    tooth.userData.typodontId = "teeth-11"
     const plugin = new PaintToolPlugin()
     const viewer = {
         teethMeshes: [tooth],
         activeTooth: tooth,
         getToothByName(name) {
-            return name === tooth.name ? tooth : undefined
+            return name === tooth.name || name === tooth.userData.typodontId
+                ? tooth
+                : undefined
+        },
+        getToothId(target) {
+            return target.userData.typodontId
         }
     }
 
@@ -56,9 +96,9 @@ test("PaintToolPlugin restores serialized vertex paint state", async () => {
 
     const state = plugin.getState()
     assert.ok(state)
-    assert.ok(state[tooth.name])
+    assert.ok(state["teeth-11"])
 
-    plugin.clearTooth(tooth.name)
+    plugin.clearTooth("teeth-11")
     assert.equal(colorArray[0], 1)
     assert.equal(colorArray[1], 1)
     assert.equal(colorArray[2], 1)
@@ -70,12 +110,15 @@ test("PaintToolPlugin restores serialized vertex paint state", async () => {
 })
 
 test("VisualizationToolPlugin tracks and reloads whole-tooth colors", async () => {
-    const selectedTooth = { name: "teeth-21" }
+    const selectedTooth = { name: "teeth_21", userData: { typodontId: "teeth-21" } }
     const setCalls = []
     const resetCalls = []
     const viewer = {
         getSelectedTeeth() {
             return [selectedTooth]
+        },
+        getToothId(target) {
+            return target.userData.typodontId
         },
         setToothColor(name, color) {
             setCalls.push([name, color])
@@ -94,6 +137,30 @@ test("VisualizationToolPlugin tracks and reloads whole-tooth colors", async () =
     await plugin.setState({ "teeth-31": "#3b82f6" })
     assert.deepEqual(resetCalls, ["teeth-21"])
     assert.deepEqual(setCalls.at(-1), ["teeth-31", "#3b82f6"])
+})
+
+test("AnnotationToolPlugin keeps one editable note per tooth", async () => {
+    installCanvasShim()
+    const tooth = createTooth("teeth_11")
+    tooth.userData.typodontId = "teeth-11"
+    const plugin = new AnnotationToolPlugin()
+    const viewer = {
+        getToothByName(name) {
+            return name === tooth.name || name === tooth.userData.typodontId
+                ? tooth
+                : undefined
+        }
+    }
+
+    plugin.install(viewer)
+    plugin.addAnnotation("teeth-11", "Initial note", new THREE.Vector3(0, 0.1, 0))
+    plugin.addAnnotation("teeth-11", "Updated note", new THREE.Vector3(0, 0.2, 0))
+
+    const state = plugin.getState()
+    assert.equal(state.length, 1)
+    assert.equal(state[0].toothId, "teeth-11")
+    assert.equal(state[0].text, "Updated note")
+    assert.deepEqual(state[0].point, [0, 0.2, 0])
 })
 
 test("ExportPlugin saves and reloads viewer state through local storage", async () => {

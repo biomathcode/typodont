@@ -29,12 +29,14 @@ export class ExportPlugin implements TypodontPlugin {
             {
                 id: "export-state",
                 label: "State",
+                icon: "file",
                 title: "Download the current viewer state as JSON",
                 onClick: () => this.downloadState()
             },
             {
                 id: "export-png",
                 label: "PNG",
+                icon: "download",
                 title: "Download the current canvas as PNG",
                 onClick: () => this.downloadPNG()
             }
@@ -80,4 +82,3 @@ export class ExportPlugin implements TypodontPlugin {
         this.viewer?.downloadPNG(fileName)
     }
 }
-

@@ -28,8 +28,9 @@ export class PaintToolPlugin implements TypodontPlugin {
 
     private presets: PaintPreset[] = [
         { id: "cavity", label: "Cavity", color: "#f4c542" },
-        { id: "yellowing", label: "Yellowing", color: "#e8da72" },
-        { id: "filling", label: "Filling", color: "#3b82f6" }
+        { id: "yellowing", label: "Yellowing", color: "#ead46d" },
+        { id: "filling", label: "Filling", color: "#3b82f6" },
+        { id: "reset", label: "Reset brush", color: "#ffffff" }
     ]
 
     install(viewer: TypodontViewer) {
@@ -41,22 +42,19 @@ export class PaintToolPlugin implements TypodontPlugin {
             {
                 id: "paint",
                 label: "Paint",
-                title: "Paint the active tooth inside the mini preview",
+                icon: "paint",
+                title: "Paint the active tooth inside the inspector preview",
                 renderPanel: (host) => {
-                    const hint = document.createElement("div")
-                    hint.className = "typodont-status"
-                    hint.textContent =
-                        "Paint on the mini preview. Orbit is disabled while this mode is active."
-                    host.appendChild(hint)
-
                     const buttons = new Map<string, HTMLButtonElement>()
                     for (const preset of this.presets) {
                         const button = document.createElement("button")
                         button.type = "button"
-                        button.className = `typodont-button${
+                        button.className = `typodont-swatch${
                             preset.id === this.activePresetId ? " is-active" : ""
                         }`
-                        button.textContent = preset.label
+                        button.title = preset.label
+                        button.setAttribute("aria-label", preset.label)
+                        button.style.setProperty("--typodont-swatch-color", preset.color)
                         button.addEventListener("click", () => {
                             this.activePresetId = preset.id
                             for (const [id, element] of buttons.entries()) {
@@ -85,12 +83,16 @@ export class PaintToolPlugin implements TypodontPlugin {
 
                     const clearButton = document.createElement("button")
                     clearButton.type = "button"
-                    clearButton.className = "typodont-button"
-                    clearButton.textContent = "Clear active"
+                    clearButton.className = "typodont-button is-icon"
+                    clearButton.title = "Reset active tooth"
+                    clearButton.setAttribute("aria-label", "Reset active tooth")
+                    clearButton.innerHTML =
+                        '<svg class="typodont-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" d="M3 12a9 9 0 1 0 3-6.7M3 4v6h6"/></svg>'
                     clearButton.addEventListener("click", () => {
                         const active = this.viewer?.activeTooth
-                        if (!active) return
-                        this.clearTooth(active.name)
+                        const toothId = active ? this.viewer?.getToothId(active) : undefined
+                        if (!toothId) return
+                        this.clearTooth(toothId)
                     })
                     host.appendChild(clearButton)
                 }
@@ -99,7 +101,6 @@ export class PaintToolPlugin implements TypodontPlugin {
     }
 
     onPreviewPointerDown(event: PointerEvent, hit?: TypodontPreviewHit) {
-        if (event.button !== 0) return true
         this.pointerId = event.pointerId
         if (hit) {
             this.paintAt(hit)
@@ -141,9 +142,10 @@ export class PaintToolPlugin implements TypodontPlugin {
             const geometry = tooth.geometry as THREE.BufferGeometry
             const colors = geometry.getAttribute("color") as THREE.BufferAttribute
             const colorArray = colors.array as Float32Array
+            const toothId = viewer.getToothId(tooth)
 
-            if (isAllWhite(colorArray)) continue
-            state[tooth.name] = encodeColorArray(colorArray)
+            if (!toothId || isAllWhite(colorArray)) continue
+            state[toothId] = encodeColorArray(colorArray)
         }
 
         return Object.keys(state).length > 0 ? state : undefined
@@ -154,7 +156,8 @@ export class PaintToolPlugin implements TypodontPlugin {
         if (!viewer) return
 
         for (const tooth of viewer.teethMeshes) {
-            this.clearTooth(tooth.name)
+            const toothId = viewer.getToothId(tooth)
+            if (toothId) this.clearTooth(toothId)
         }
 
         if (!state || typeof state !== "object") return
@@ -203,4 +206,3 @@ export class PaintToolPlugin implements TypodontPlugin {
         colors.needsUpdate = true
     }
 }
-

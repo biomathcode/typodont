@@ -9,9 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "three": "^0.183.2",
     "typodont": "workspace:^"
   },
   "devDependencies": {
+    "@types/three": "^0.183.0",
     "typescript": "~5.9.3",
     "vite": "^7.3.1"
   }

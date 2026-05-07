@@ -10,6 +10,8 @@
     "test": "pnpm --filter=typodont test",
     "site:dev": "pnpm --filter=site dev",
     "site:build": "pnpm run build && pnpm --filter=site build",
+    "storybook": "pnpm --filter=site storybook",
+    "build-storybook": "pnpm --filter=site build-storybook",
     "lint": "pnpm --filter=typodont lint",
     "lint:fix": "pnpm --filter=typodont lint:fix",
     "pre-commit": "pnpm run --filter=typodont pre-commit",

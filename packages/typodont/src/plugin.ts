@@ -20,6 +20,7 @@ export type TypodontPreviewHit = {
 export type TypodontToolDefinition = {
     id: string
     label: string
+    icon?: string
     title?: string
     renderPanel?: (
         host: HTMLElement,
@@ -30,6 +31,7 @@ export type TypodontToolDefinition = {
 export type TypodontActionDefinition = {
     id: string
     label: string
+    icon?: string
     title?: string
     onClick: (viewer: TypodontViewer) => void
 }
@@ -44,6 +46,7 @@ export interface TypodontPlugin {
     getActions?(): TypodontActionDefinition[]
 
     onModelLoad?(): void
+    onModelUnload?(): void
     onSelectionChange?(detail: TypodontSelectionChangeDetail): void
     onActiveToolChange?(activeTool: string, previousTool?: string): void
 
@@ -67,4 +70,3 @@ export interface TypodontPlugin {
     getState?(): unknown
     setState?(state: unknown): void | Promise<void>
 }
-

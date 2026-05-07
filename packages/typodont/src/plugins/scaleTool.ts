@@ -1,22 +1,22 @@
 import type { TypodontPlugin, TypodontToolDefinition } from "../plugin"
 import type { TypodontViewer } from "../viewer"
 
-export class RotateToolPlugin implements TypodontPlugin {
-    name = "rotateTool"
+export class ScaleToolPlugin implements TypodontPlugin {
+    name = "scaleTool"
     private viewer?: TypodontViewer
 
     install(viewer: TypodontViewer) {
         this.viewer = viewer
-        viewer.registerTransformTool("rotate", "rotate")
+        viewer.registerTransformTool("scale", "scale")
     }
 
     getTools(): TypodontToolDefinition[] {
         return [
             {
-                id: "rotate",
-                label: "Rotate",
-                icon: "rotate",
-                title: "Rotate a selected tooth with a gizmo",
+                id: "scale",
+                label: "Scale",
+                icon: "scale",
+                title: "Scale a selected tooth with a gizmo",
                 renderPanel: (host) => {
                     const resetButton = document.createElement("button")
                     resetButton.type = "button"
@@ -28,7 +28,9 @@ export class RotateToolPlugin implements TypodontPlugin {
                     resetButton.addEventListener("click", () => {
                         const active = this.viewer?.activeTooth
                         if (!active) return
-                        this.viewer?.resetToothTransform(active.name)
+                        const toothId = this.viewer?.getToothId(active)
+                        if (!toothId) return
+                        this.viewer?.resetToothTransform(toothId)
                     })
 
                     host.append(resetButton)

@@ -12,6 +12,7 @@ export class VisualizationToolPlugin implements TypodontPlugin {
     name = "visualizationTool"
     private viewer?: TypodontViewer
     private colors = new Map<string, string>()
+    private customColor = "#d94841"
 
     private presets: ColorPreset[] = [
         { label: "Issue", value: "#d94841" },
@@ -23,39 +24,66 @@ export class VisualizationToolPlugin implements TypodontPlugin {
         this.viewer = viewer
     }
 
+    onModelUnload() {
+        this.colors.clear()
+    }
+
     getTools(): TypodontToolDefinition[] {
         return [
             {
                 id: "visualize",
                 label: "Visualize",
+                icon: "visualize",
                 title: "Color-code selected teeth",
                 renderPanel: (host) => {
-                    const hint = document.createElement("div")
-                    hint.className = "typodont-status"
-                    hint.textContent =
-                        "Select teeth in the main view, then apply a whole-tooth clinical color."
-                    host.appendChild(hint)
-
                     for (const preset of this.presets) {
                         const button = document.createElement("button")
                         button.type = "button"
-                        button.className = "typodont-button"
-                        button.textContent = preset.label
+                        button.className = "typodont-swatch"
+                        button.title = preset.label
+                        button.setAttribute("aria-label", preset.label)
+                        button.style.setProperty("--typodont-swatch-color", preset.value)
                         button.addEventListener("click", () => {
                             this.applyToSelection(preset.value)
                         })
                         host.appendChild(button)
                     }
 
+                    const colorField = document.createElement("label")
+                    colorField.className = "typodont-field"
+                    colorField.textContent = "Custom"
+
+                    const colorInput = document.createElement("input")
+                    colorInput.type = "color"
+                    colorInput.value = this.customColor
+                    colorInput.addEventListener("input", () => {
+                        this.customColor = colorInput.value
+                    })
+                    colorField.appendChild(colorInput)
+                    host.appendChild(colorField)
+
+                    const customButton = document.createElement("button")
+                    customButton.type = "button"
+                    customButton.className = "typodont-button"
+                    customButton.textContent = "Apply"
+                    customButton.addEventListener("click", () => {
+                        this.applyToSelection(this.customColor)
+                    })
+                    host.appendChild(customButton)
+
                     const clearButton = document.createElement("button")
                     clearButton.type = "button"
-                    clearButton.className = "typodont-button"
-                    clearButton.textContent = "Clear selected"
+                    clearButton.className = "typodont-button is-icon"
+                    clearButton.title = "Clear selected tooth colors"
+                    clearButton.setAttribute("aria-label", "Clear selected tooth colors")
+                    clearButton.innerHTML =
+                        '<svg class="typodont-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="currentColor" d="M3 12a9 9 0 1 0 3-6.7M3 4v6h6"/></svg>'
                     clearButton.addEventListener("click", () => {
                         const viewer = this.viewer
                         if (!viewer) return
                         for (const tooth of viewer.getSelectedTeeth()) {
-                            this.clearTooth(tooth.name)
+                            const toothId = viewer.getToothId(tooth)
+                            if (toothId) this.clearTooth(toothId)
                         }
                     })
                     host.appendChild(clearButton)
@@ -69,8 +97,10 @@ export class VisualizationToolPlugin implements TypodontPlugin {
         if (!viewer) return
 
         for (const tooth of viewer.getSelectedTeeth()) {
-            viewer.setToothColor(tooth.name, color)
-            this.colors.set(tooth.name, color)
+            const toothId = viewer.getToothId(tooth)
+            if (!toothId) continue
+            viewer.setToothColor(toothId, color)
+            this.colors.set(toothId, color)
         }
     }
 
@@ -98,4 +128,3 @@ export class VisualizationToolPlugin implements TypodontPlugin {
         }
     }
 }
-
