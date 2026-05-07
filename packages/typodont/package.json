@@ -1,7 +1,7 @@
 {
   "name": "typodont",
   "type": "module",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": false,
   "description": "Three.js typodont viewer",
   "main": "./dist/index.cjs",
@@ -22,7 +22,8 @@
   ],
   "scripts": {
     "build": "tsdown src/index.ts --format esm,cjs --dts --loader:.glb=asset",
-    "dev": "tsdown --watch"
+    "dev": "tsdown --watch",
+    "test": "pnpm build && node --test test/**/*.test.mjs"
   },
   "devDependencies": {
     "tsdown": "^0.21.1",

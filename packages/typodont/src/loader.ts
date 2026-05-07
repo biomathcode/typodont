@@ -1,43 +1,93 @@
 import * as THREE from "three"
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js"
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
+import {
+    resolveTypodontModelSource,
+    type TypodontModelSource
+} from "./modelSource"
 
-import modelUrl from "../assets/typodont.glb"
+const cachedModels = new Map<string, THREE.Group>()
+const loadingPromises = new Map<string, Promise<THREE.Group>>()
 
-let cachedModel: THREE.Group | null = null
-let loadingPromise: Promise<THREE.Group> | null = null
+function createLoader(source: ReturnType<typeof resolveTypodontModelSource>) {
+    const loader = new GLTFLoader()
+    const dracoLoader = new DRACOLoader()
 
-const loader = new GLTFLoader()
+    dracoLoader.setDecoderPath(source.dracoDecoderPath)
+    loader.setDRACOLoader(dracoLoader)
+    loader.setRequestHeader(source.headers)
+    loader.setWithCredentials(source.withCredentials)
 
-// Draco decoder setup
-const dracoLoader = new DRACOLoader()
+    return { loader, dracoLoader }
+}
 
-// Use CDN decoder (simplest for libraries)
-dracoLoader.setDecoderPath(
-    "https://www.gstatic.com/draco/versioned/decoders/1.5.7/"
-)
+function getBasePath(url: string) {
+    try {
+        const parsed = new URL(url, window.location.href)
+        const pathname = parsed.pathname.replace(/[^/]+$/, "")
+        return `${parsed.origin}${pathname}`
+    } catch {
+        return url.slice(0, url.lastIndexOf("/") + 1)
+    }
+}
 
-loader.setDRACOLoader(dracoLoader)
+async function fetchModelBytes(source: ReturnType<typeof resolveTypodontModelSource>) {
+    const response = await fetch(source.url, {
+        credentials: source.withCredentials ? "include" : "same-origin",
+        headers: source.headers
+    })
 
-export async function loadTypodont(): Promise<THREE.Group> {
-    if (cachedModel) {
-        return cachedModel.clone(true)
+    if (!response.ok) {
+        throw new Error(
+            `Typodont model request failed (${response.status} ${response.statusText}) for ${source.url}`
+        )
     }
 
-    if (!loadingPromise) {
-        loadingPromise = new Promise((resolve, reject) => {
-            loader.load(
-                modelUrl,
-                (gltf) => {
-                    cachedModel = gltf.scene
-                    resolve(cachedModel.clone(true))
-                },
-                undefined,
-                reject
-            )
-        })
+    const contentType = response.headers.get("content-type") ?? ""
+    if (contentType.includes("text/html")) {
+        throw new Error(
+            `Typodont model URL returned HTML instead of a GLB: ${source.url}. Check the CDN path, version, or license configuration.`
+        )
     }
 
-    const model = await loadingPromise
+    return response.arrayBuffer()
+}
+
+export async function loadTypodont(
+    source?: string | TypodontModelSource
+): Promise<THREE.Group> {
+    const resolved = resolveTypodontModelSource(source)
+
+    if (cachedModels.has(resolved.cacheKey)) {
+        return cachedModels.get(resolved.cacheKey)!.clone(true)
+    }
+
+    if (!loadingPromises.has(resolved.cacheKey)) {
+        loadingPromises.set(
+            resolved.cacheKey,
+            (async () => {
+                const bytes = await fetchModelBytes(resolved)
+                const { loader, dracoLoader } = createLoader(resolved)
+
+                try {
+                    const model = await new Promise<THREE.Group>((resolve, reject) => {
+                        loader.parse(
+                            bytes,
+                            getBasePath(resolved.url),
+                            (gltf) => resolve(gltf.scene),
+                            reject
+                        )
+                    })
+
+                    cachedModels.set(resolved.cacheKey, model)
+                    return model.clone(true)
+                } finally {
+                    dracoLoader.dispose()
+                }
+            })()
+        )
+    }
+
+    const model = await loadingPromises.get(resolved.cacheKey)!
     return model.clone(true)
 }
