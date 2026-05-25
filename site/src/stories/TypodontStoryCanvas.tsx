@@ -9,6 +9,7 @@ import {
   ScaleToolPlugin,
   TypodontViewer,
   type TypodontInteractionKeyOptions,
+  type TypodontModelSource,
   VisualizationToolPlugin,
   type TypodontSelectionChangeDetail,
 } from "typodont"
@@ -25,6 +26,11 @@ type ScenarioMeta = {
   title: string
   description: string
   theme: Record<string, string>
+}
+
+const storybookModelSource: TypodontModelSource = {
+  url: "https://raw.githubusercontent.com/biomathcode/typodont/main/packages/typodont/assets/typodont.glb",
+  cacheKey: "github-raw-typodont-model",
 }
 
 const scenarioMeta: Record<StoryScenario, ScenarioMeta> = {
@@ -104,6 +110,7 @@ function createViewerForScenario(
     case "paint": {
       const viewer = new TypodontViewer(container, {
         defaultTool: "paint",
+        model: storybookModelSource,
         initialSelection: ["teeth-26"],
         interactionKeys,
       })
@@ -121,6 +128,7 @@ function createViewerForScenario(
     case "deformity": {
       const viewer = new TypodontViewer(container, {
         defaultTool: "scale",
+        model: storybookModelSource,
         initialSelection: ["teeth-12", "teeth-22"],
         interactionKeys,
         initialTeeth: {
@@ -150,6 +158,7 @@ function createViewerForScenario(
       const visualization = new VisualizationToolPlugin()
       const viewer = new TypodontViewer(container, {
         defaultTool: "visualize",
+        model: storybookModelSource,
         initialSelection: ["teeth-16", "teeth-21", "teeth-36", "teeth-46"],
         interactionKeys,
       })
@@ -174,6 +183,7 @@ function createViewerForScenario(
     case "environment": {
       const viewer = new TypodontViewer(container, {
         defaultTool: "lighting",
+        model: storybookModelSource,
         initialSelection: ["teeth-11"],
         interactionKeys,
         lighting: {
@@ -199,6 +209,7 @@ function createViewerForScenario(
     case "hidden": {
       const viewer = new TypodontViewer(container, {
         defaultTool: "labels",
+        model: storybookModelSource,
         initialSelection: ["teeth-13", "teeth-23"],
         interactionKeys,
         initialTeeth: {
@@ -225,6 +236,7 @@ function createViewerForScenario(
     default: {
       const viewer = new TypodontViewer(container, {
         defaultTool: "labels",
+        model: storybookModelSource,
         initialSelection: ["teeth-11", "teeth-21"],
         interactionKeys,
       })
